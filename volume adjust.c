@@ -1,5 +1,14 @@
-#define OLD_FILE_PATH "16k.pcm"
-#define VOL_FILE_PATH "vol.pcm"
+/*
+    使用说明：执行时输入三个参数，用空格分开
+    第一个参数：int型，范围1-10，小于五为降低音量，反之为升高
+    第二个参数：输入音频，为pcm
+    第三个参数：输出音频，为pcm
+    程序会自动执行到dB值合适为止
+*/
+//#define OLD_FILE_PATH "2.pcm"
+//这里定义修改前的文件名
+//#define VOL_FILE_PATH "out2.pcm"
+//这里是修改后的文件名
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -8,6 +17,10 @@
 //返回值为分贝
 #define VOLUMEMAX   32767
 
+//只能对.pcm音频文件操作
+
+char OLD_FILE_PATH[100];
+char VOL_FILE_PATH[100];
 
 int file_size(const char* filename)
 {
@@ -16,7 +29,7 @@ int file_size(const char* filename)
     fseek(fp,0,SEEK_END);
     int size=ftell(fp);
     fclose(fp);
-    return (size);
+    return size;
 }
 
 /*int SimpleCalculate_DB(short* pcmData, int sample)
@@ -77,7 +90,7 @@ int volume_adjust(short  * in_buf, short  * out_buf, float in_vol)
     if(-98<vol && vol<0)
         vol = 1/(vol*(-1));
     else if(0<=vol && vol<=1)
-        vol = 1;
+        vol = 5;
 /*    
     else if(1<=vol && vol<=2)
         vol = 20;
@@ -85,9 +98,9 @@ int volume_adjust(short  * in_buf, short  * out_buf, float in_vol)
     else if(vol<=-98)
         vol = 0;
     else if(vol>=2)
-        vol = 40;  //这个值可以根据你的实际情况去调整
+        vol = 10;  //这个值可以根据你的实际情况去调整
 
-    tmp = (*in_buf)*vol; // 上面所有关于vol的判断，其实都是为了此处*in_buf乘以一个倍数，你可以根据自己的需要去修改
+    tmp = (*in_buf)*(in_vol/5); // 上面所有关于vol的判断，其实都是为了此处*in_buf乘以一个倍数，你可以根据自己的需要去修改
  
     // 下面的code主要是为了溢出判断
     if(tmp > 32767)
@@ -125,7 +138,7 @@ void pcm_volume_control(int volume)
     fclose(fp_vol);
 }
 
-void show_db(void)
+int show_db(char *file)
 {
     unsigned char *In;
     unsigned char *Out;
@@ -142,13 +155,47 @@ void show_db(void)
     fread(In, 2, file_size(OLD_FILE_PATH), fp);
     fread(Out, 2, file_size(VOL_FILE_PATH), fp_vol);
 
-    printf("%d %d\n",getPcmDB(In,sizeof(In)),getPcmDB(Out,sizeof(Out)));
+    fclose(fp);
+    fclose(fp_vol);
+
+    //printf("%d %d\n",getPcmDB(In,sizeof(In)),getPcmDB(Out,sizeof(Out)));
+    if(strncmp(file,"In",2)==0)
+    {
+        return getPcmDB(In,sizeof(In));
+    }
+    else if(strncmp(file,"Out",3)==0)
+    {
+        return getPcmDB(Out,sizeof(Out));
+    }
+    else 
+    {
+        return -1;
+    }
 }
 
-int main(void)
+int main(int argc,char *argv[])
 {
-    pcm_volume_control(100);
-    show_db();
+    if(argc==4)
+    {
+        float volume = atoi(argv[1]);
+        strcpy(OLD_FILE_PATH,argv[2]);
+        strcpy(VOL_FILE_PATH,argv[3]);
+        pcm_volume_control(volume);
+        do
+        {
+            if(show_db((char *)"Out")-45 >= 0)
+            {
+                volume -= 0.75;
+                pcm_volume_control(volume);
+            }
+            else if(show_db((char *)"Out")-45 < 0)
+            {
+                volume += 0.75;
+                pcm_volume_control(volume);
+            }
+        }while(abs(show_db((char *)"Out")-40)>=2);
+        printf("%d %d\n",show_db((char *)"In"),show_db((char *)"Out"));
+    }
     return 0;
 }
 
